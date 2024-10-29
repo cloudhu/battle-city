@@ -1,51 +1,32 @@
 use bevy::prelude::*;
-// 关卡地图行数和列数 // Level map row and column numbers
-/*
-pub const LDTK_MAP: &str = "levels_namcot_original_35.ldtk";
-pub const LEVEL_ROWS: i32 = 13;
-pub const LEVEL_COLUMNS: i32 = 13;
-pub const TILE_SIZE: f32 = 32.0;
- */
 
-// Uncomment it to return to a custom map settings
-pub const LDTK_MAP: &str = "levels.ldtk";
+// 关卡地图行数和列数
 pub const LEVEL_ROWS: i32 = 18;
 pub const LEVEL_COLUMNS: i32 = 27;
 pub const TILE_SIZE: f32 = 32.0;
-
-// 关卡数量 // Number of levels
+// 关卡数量
 pub const MAX_LEVELS: i32 = 2;
-// 同时共存的敌人最大数量 // The maximum number of enemies that can coexist at the same time
+// 同时共存的敌人最大数量
 pub const MAX_LIVE_ENEMIES: i32 = 5;
-// 每关敌人数量 // Number of enemies per level
+// 每关敌人数量
 pub const ENEMIES_PER_LEVEL: i32 = 12;
-// 坦克刷新子弹间隔（秒）// Tank refresh bullet interval (seconds)
+// 坦克刷新子弹间隔（秒）
 pub const PLAYER_REFRESH_BULLET_INTERVAL: f32 = 0.5;
 pub const ENEMY_REFRESH_BULLET_INTERVAL: f32 = 2.0;
-// 坦克速度、大小和缩放比例 // Tank speed, size and scaling
+// 坦克速度、大小和缩放比例
 pub const PLAYER_SPEED: f32 = 150.0;
 pub const ENEMY_SPEED: f32 = 100.0;
-pub const TANK_SIZE: f32 = 32.0;
-pub const TANK_SCALE: f32 = 1.0;
-pub const TANK_ROUND_CORNERS: f32 = 8.0;
-pub const PHYSICS_SCALE_PER_METER: f32 = 100.0;
+pub const TANK_SIZE: f32 = 28.0;
+pub const TANK_SCALE: f32 = 0.8;
 
-// sprite z轴顺序 // Sprite z-axis order
-pub const SPRITE_GAME_OVER_Z_ORDER: f32 = 4.0;
-pub const SPRITE_TREE_Z_ORDER: f32 = 3.0;
-pub const SPRITE_PLAYER_Z_ORDER: f32 = 1.0;
-pub const TANKS_SPRITE: &str = "textures/spriteTanks32.png";
-pub const TANKS_SPRITE_CELL: u32 = 32;
-pub const TANKS_SPRITE_COLS_AMOUNT: i32 = 16;
-pub const MAP_SPRITE: &str = "textures/spriteMapObjects32.png";
-pub const MAP_SPRITE_CELL: u32 = 32;
-
-pub const BEVY_FRAMERATE: f32 = 0.14; // TODO: Change it to 0.15 for Bevy v0.13
+// sprite z轴顺序
+pub const SPRITE_GAME_OVER_ORDER: f32 = 4.0;
+pub const SPRITE_TREE_ORDER: f32 = 3.0;
+pub const SPRITE_PLAYER_ORDER: f32 = 2.0;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, States, Default)]
 pub enum AppState {
     #[default]
-    Splash,
     StartMenu,
     Playing,
     Paused,
@@ -58,7 +39,7 @@ pub enum MultiplayerMode {
     TwoPlayers,
 }
 
-// 方向 // Direction
+// 方向
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
     Left,
@@ -76,7 +57,7 @@ pub struct AnimationIndices {
     pub last: usize,
 }
 
-// 坦克刷新子弹计时器 // Tank refresh bullet timer
+// 坦克刷新子弹计时器
 #[derive(Component, Deref, DerefMut)]
 pub struct TankRefreshBulletTimer(pub Timer);
 
@@ -94,21 +75,16 @@ pub struct GameSounds {
     pub game_pause: Handle<AudioSource>,
 }
 
-#[derive(Resource)]
-pub struct GameTextureLayout {
-    pub tanks: Handle<TextureAtlasLayout>,
-    pub map: Handle<TextureAtlasLayout>,
-    pub bullet: Handle<TextureAtlasLayout>,
-    pub born: Handle<TextureAtlasLayout>,
+#[derive(Debug, Resource)]
+pub struct GameTextureAtlasHandles {
+    pub bullet: Handle<TextureAtlas>,
+    pub shield: Handle<TextureAtlas>,
+    pub born: Handle<TextureAtlas>,
+    pub player1: Handle<TextureAtlas>,
+    pub player2: Handle<TextureAtlas>,
+    pub enemies: Handle<TextureAtlas>,
 }
 
-#[derive(Debug, Resource)]
-pub struct GameTextureHandles {
-    pub tanks: Handle<Image>,
-    pub map: Handle<Image>,
-    pub bullet: Handle<Image>,
-    pub born: Handle<Image>,
-}
 pub fn setup_game_sounds(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(GameSounds {
         start_menu: asset_server.load("sounds/start_menu.ogg"),
@@ -124,59 +100,73 @@ pub fn setup_game_sounds(mut commands: Commands, asset_server: Res<AssetServer>)
 pub fn setup_game_texture_atlas(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
-    mut app_state: ResMut<NextState<AppState>>,
+    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
 ) {
-    // 炮弹 // Bullet
+    // 炮弹
     let bullet_texture_handle = asset_server.load("textures/bullet.bmp");
-    let bullet_texture_layout = TextureAtlasLayout::from_grid(UVec2::new(7, 8), 4, 1, None, None);
-    let bullet_atlas_layout = texture_atlas_layouts.add(bullet_texture_layout);
+    let bullet_texture_atlas =
+        TextureAtlas::from_grid(bullet_texture_handle, Vec2::new(7.0, 8.0), 4, 1, None, None);
+    let bullet_texture_atlas_handle = texture_atlases.add(bullet_texture_atlas);
 
-    // 出生效果 // Birth effects
+    // 保护盾
+    let shield_texture_handle = asset_server.load("textures/shield.bmp");
+    let shield_texture_atlas = TextureAtlas::from_grid(
+        shield_texture_handle,
+        Vec2::new(31.0, 31.0),
+        1,
+        2,
+        None,
+        None,
+    );
+    let shield_texture_atlas_handle = texture_atlases.add(shield_texture_atlas);
+
+    // 玩家1
+    let player1_texture_handle = asset_server.load("textures/tank1.bmp");
+    let player1_texture_atlas = TextureAtlas::from_grid(
+        player1_texture_handle,
+        Vec2::new(TANK_SIZE, TANK_SIZE),
+        8,
+        4,
+        None,
+        None,
+    );
+    let player1_texture_atlas_handle = texture_atlases.add(player1_texture_atlas);
+
+    // 玩家2
+    let player2_texture_handle = asset_server.load("textures/tank2.bmp");
+    let player2_texture_atlas = TextureAtlas::from_grid(
+        player2_texture_handle,
+        Vec2::new(TANK_SIZE, TANK_SIZE),
+        8,
+        4,
+        None,
+        None,
+    );
+    let player2_texture_atlas_handle = texture_atlases.add(player2_texture_atlas);
+
+    // 出生效果
     let born_texture_handle = asset_server.load("textures/born.bmp");
-    let born_texture_layout = TextureAtlasLayout::from_grid(UVec2::splat(32), 4, 1, None, None);
-    let born_atlas_layout = texture_atlas_layouts.add(born_texture_layout);
+    let born_texture_atlas =
+        TextureAtlas::from_grid(born_texture_handle, Vec2::new(32.0, 32.0), 4, 1, None, None);
+    let born_texture_atlas_handle = texture_atlases.add(born_texture_atlas);
 
-    // Players and enemies tanks sprite
-    let tanks_texture_handle = asset_server.load(TANKS_SPRITE);
-    let tanks_texture_atlas_layout =
-        TextureAtlasLayout::from_grid(UVec2::splat(TANKS_SPRITE_CELL), 16, 16, None, None);
-    let tanks_atlas_layout = texture_atlas_layouts.add(tanks_texture_atlas_layout);
+    let enemies_texture_handle = asset_server.load("textures/enemies.bmp");
+    let enemies_texture_atlas = TextureAtlas::from_grid(
+        enemies_texture_handle,
+        Vec2::new(TANK_SIZE, TANK_SIZE),
+        8,
+        8,
+        None,
+        None,
+    );
+    let enemies_texture_atlas_handle = texture_atlases.add(enemies_texture_atlas);
 
-    // Map objects sprite with Home and Shield
-    let map_texture_handle = asset_server.load(MAP_SPRITE);
-    let map_texture_atlas_layout =
-        TextureAtlasLayout::from_grid(UVec2::splat(MAP_SPRITE_CELL), 5, 4, None, None);
-    let map_atlas_layout = texture_atlas_layouts.add(map_texture_atlas_layout);
-
-    commands.insert_resource(GameTextureLayout {
-        tanks: tanks_atlas_layout,
-        map: map_atlas_layout,
-        bullet: bullet_atlas_layout,
-        born: born_atlas_layout,
+    commands.insert_resource(GameTextureAtlasHandles {
+        bullet: bullet_texture_atlas_handle,
+        shield: shield_texture_atlas_handle,
+        born: born_texture_atlas_handle,
+        player1: player1_texture_atlas_handle,
+        player2: player2_texture_atlas_handle,
+        enemies: enemies_texture_atlas_handle,
     });
-    commands.insert_resource(GameTextureHandles {
-        tanks: tanks_texture_handle,
-        map: map_texture_handle,
-        bullet: bullet_texture_handle,
-        born: born_texture_handle,
-    });
-    app_state.set(AppState::StartMenu);
-}
-
-pub fn animate_sprite<T: Component>(
-    time: Res<Time>,
-    mut query: Query<(&mut AnimationTimer, &AnimationIndices, &mut TextureAtlas), With<T>>,
-) {
-    for (mut timer, indices, mut sprite) in &mut query {
-        timer.0.tick(time.delta());
-        if timer.0.just_finished() {
-            // 切换到下一个sprite // Switch to next sprite
-            sprite.index = if sprite.index == indices.last {
-                indices.first
-            } else {
-                sprite.index + 1
-            };
-        }
-    }
 }

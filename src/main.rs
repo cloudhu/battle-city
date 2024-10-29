@@ -20,28 +20,18 @@ use bevy_rapier2d::prelude::*;
 
 const BACKGROUND_COLOR: Color = Color::BLACK;
 
-// TODO 坦克碰撞导致被迫移动 // TODO: Tank collision causes forced movement
+// TODO 坦克碰撞导致被迫移动
 fn main() {
     App::new()
         .register_type::<PlayerNo>()
-        .add_plugins(
-            DefaultPlugins
-                .set(ImagePlugin::default_nearest())
-                .set(bevy::log::LogPlugin {
-                    level: bevy::log::Level::DEBUG,
-                    filter: "wgpu=warn,bevy_ecs=info,naga=info,bevy_render=info,bevy_app=info"
-                        .to_string(),
-                    custom_layer: |_| None,
-                }),
-        )
-        .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(
-            PHYSICS_SCALE_PER_METER,
-        ))
+        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+        .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         // .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugins(LdtkPlugin)
         .add_event::<ExplosionEvent>()
         .add_event::<SpawnPlayerEvent>()
         .add_event::<HomeDyingEvent>()
+        .add_state::<AppState>()
         .insert_resource(ClearColor(BACKGROUND_COLOR))
         .insert_resource(MultiplayerMode::SinglePlayer)
         .insert_resource(LevelSelection::index(0))
@@ -50,21 +40,13 @@ fn main() {
             player1: 3,
             player2: 3,
         })
-        .register_ldtk_entity::<BrickWallBundle>("BrickWall")
-        .register_ldtk_entity::<IronWallBundle>("IronWall")
-        .register_ldtk_entity::<WaterBundle>("Water")
-        .register_ldtk_entity::<HomeBundle>("Home")
-        .register_ldtk_entity::<Player1MarkerBundle>("Player1")
-        .register_ldtk_entity::<Player2MarkerBundle>("Player2")
-        .register_ldtk_entity::<EnemiesMarkerBundle>("Enemies")
-        .register_ldtk_entity::<BrickWallRightBundle>("BrickWallRight")
-        .register_ldtk_entity::<BrickWallBottomBundle>("BrickWallBottom")
-        .register_ldtk_entity::<BrickWallLeftBundle>("BrickWallLeft")
-        .register_ldtk_entity::<BrickWallTopBundle>("BrickWallTop")
-        .register_ldtk_entity::<IronWallRightBundle>("IronWallRight")
-        .register_ldtk_entity::<IronWallBottomBundle>("IronWallBottom")
-        .register_ldtk_entity::<IronWallLeftBundle>("IronWallLeft")
-        .register_ldtk_entity::<IronWallTopBundle>("IronWallTop")
+        .register_ldtk_entity::<level::StoneWallBundle>("StoneWall")
+        .register_ldtk_entity::<level::IronWallBundle>("IronWall")
+        .register_ldtk_entity::<level::WaterBundle>("Water")
+        .register_ldtk_entity::<level::HomeBundle>("Home")
+        .register_ldtk_entity::<level::Player1MarkerBundle>("Player1")
+        .register_ldtk_entity::<level::Player2MarkerBundle>("Player2")
+        .register_ldtk_entity::<level::EnemiesMarkerBundle>("Enemies")
         .add_systems(
             Startup,
             (
@@ -76,7 +58,6 @@ fn main() {
                 setup_game_texture_atlas,
             ),
         )
-        .init_state::<AppState>()
         .add_systems(
             OnEnter(AppState::StartMenu),
             (
@@ -98,8 +79,6 @@ fn main() {
             Update,
             (start_game, switch_multiplayer_mode).run_if(in_state(AppState::StartMenu)),
         )
-        // Uncomment to skip the start screen
-        //.add_systems(Update, (dev_start_game).run_if(in_state(AppState::StartMenu)))
         .add_systems(
             OnExit(AppState::StartMenu),
             (despawn_screen::<OnStartMenuScreen>,),

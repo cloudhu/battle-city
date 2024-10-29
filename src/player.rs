@@ -6,15 +6,15 @@ use crate::common::{self, *};
 use crate::level::Player2Marker;
 use crate::level::{Player1Marker, LEVEL_TRANSLATION_OFFSET};
 
-// 出生保护盾 // Birth protection shield
+// 出生保护盾
 #[derive(Component)]
 pub struct Shield;
 
-// 出生保护盾计时 // Birth shield timing
+// 出生保护盾计时
 #[derive(Component)]
 pub struct ShieldRemoveTimer(pub Timer);
 
-// 出生特效 // Birth effects
+// 出生特效
 #[derive(Component)]
 pub struct Born;
 #[derive(Component)]
@@ -38,7 +38,6 @@ pub struct PlayerLives {
 
 pub fn auto_spawn_players(
     mut commands: Commands,
-    game_texture_handles: Res<GameTextureHandles>,
     q_players: Query<&PlayerNo>,
     q_player1_marker: Query<&Transform, With<Player1Marker>>,
     q_player2_marker: Query<&Transform, With<Player2Marker>>,
@@ -47,7 +46,7 @@ pub fn auto_spawn_players(
     mut spawning_player2: Local<bool>,
     multiplayer_mode: Res<MultiplayerMode>,
     mut player_lives: ResMut<PlayerLives>,
-    game_texture_atlas: Res<GameTextureLayout>,
+    game_texture_atlas: Res<GameTextureAtlasHandles>,
 ) {
     let mut player1_exists = false;
     let mut player2_exists = false;
@@ -59,17 +58,15 @@ pub fn auto_spawn_players(
             player2_exists = true;
         }
     }
-
     if !player1_exists {
         for player1_marker in &q_player1_marker {
             if !*spawning_player1 && player_lives.player1 > 0 {
-                // 出生动画 // Birth animation
+                // 出生动画
                 spawn_born(
                     player1_marker.translation + LEVEL_TRANSLATION_OFFSET,
                     PlayerNo(1),
                     &mut commands,
-                    game_texture_handles.born.clone(),
-                    game_texture_atlas.born.clone()
+                    &game_texture_atlas,
                 );
                 *spawning_player1 = true;
             }
@@ -78,68 +75,50 @@ pub fn auto_spawn_players(
     if !player2_exists && *multiplayer_mode == MultiplayerMode::TwoPlayers {
         for player2_marker in &q_player2_marker {
             if !*spawning_player2 && player_lives.player2 > 0 {
-                // 出生动画 // Birth animation
+                // 出生动画
                 spawn_born(
                     player2_marker.translation + LEVEL_TRANSLATION_OFFSET,
                     PlayerNo(2),
                     &mut commands,
-                    game_texture_handles.born.clone(),
-                    game_texture_atlas.born.clone()
+                    &game_texture_atlas,
                 );
                 *spawning_player2 = true;
             }
         }
     }
-
-    // 出生动画完毕后，进行player创建 // When the birth animation is completed, create the player
+    // 出生动画完毕后，进行player创建
     for spawn_player_event in spawn_player_er.read() {
-        // dbg!(spawn_player_event);
-        // 保护盾 // Protective shield
+        dbg!(spawn_player_event);
+        // 保护盾
         let shield = commands
             .spawn((
                 Shield,
-                SpriteBundle {
-                    texture: game_texture_handles.map.clone(),
-                    transform: Transform::from_translation(Vec3::new(0.0, 0.0, 1.0)), // 通过z轴控制sprite order // Control sprite order through z-axis
+                SpriteSheetBundle {
+                    texture_atlas: game_texture_atlas.shield.clone(),
+                    transform: Transform::from_translation(Vec3::new(0.0, 0.0, -1.0)), // 通过z轴控制sprite order
                     ..default()
                 },
-                AnimationTimer(Timer::from_seconds(
-                    BEVY_FRAMERATE / 2.0,
-                    TimerMode::Repeating,
-                )),
-                AnimationIndices {
-                    first: 17,
-                    last: 18,
-                },
-                TextureAtlas {
-                    layout: game_texture_atlas.map.clone(),
-                    index: 17,
-                },
-                ShieldRemoveTimer(Timer::from_seconds(2.0, TimerMode::Once)),
+                AnimationTimer(Timer::from_seconds(0.2, TimerMode::Repeating)),
+                AnimationIndices { first: 0, last: 1 },
+                ShieldRemoveTimer(Timer::from_seconds(5.0, TimerMode::Once)),
             ))
             .id();
 
-        // 坦克  // Battle tank
-        let mut player_sprite_offset = 0;
-        if spawn_player_event.player_no.0 == 2 {
-            player_sprite_offset = 128;
-        }
-
+        // 坦克
         let tank = commands
             .spawn((
                 spawn_player_event.player_no,
-                SpriteBundle {
-                    texture: game_texture_handles.tanks.clone(),
+                SpriteSheetBundle {
+                    texture_atlas: if spawn_player_event.player_no.0 == 1 {
+                        game_texture_atlas.player1.clone()
+                    } else {
+                        game_texture_atlas.player2.clone()
+                    },
                     transform: Transform {
-                        translation: spawn_player_event.pos.extend(SPRITE_PLAYER_Z_ORDER),
+                        translation: spawn_player_event.pos.extend(SPRITE_PLAYER_ORDER),
                         scale: Vec3::splat(TANK_SCALE),
                         ..default()
                     },
-                    ..default()
-                },
-                TextureAtlas{
-                  layout:game_texture_atlas.tanks.clone(),
-                    index:player_sprite_offset,
                     ..default()
                 },
                 TankRefreshBulletTimer(Timer::from_seconds(
@@ -148,17 +127,11 @@ pub fn auto_spawn_players(
                 )),
                 common::Direction::Up,
                 AnimationTimer(Timer::from_seconds(0.2, TimerMode::Repeating)),
-                AnimationIndices {
-                    first: player_sprite_offset,
-                    last: 1 + player_sprite_offset,
-                },
+                AnimationIndices { first: 0, last: 1 },
                 RigidBody::Dynamic,
                 Velocity::zero(),
-                Collider::round_cuboid(
-                    (TANK_SIZE * TANK_SCALE / 2.0) - TANK_ROUND_CORNERS,
-                    (TANK_SIZE * TANK_SCALE / 2.0) - TANK_ROUND_CORNERS,
-                    TANK_ROUND_CORNERS / PHYSICS_SCALE_PER_METER,
-                ),
+                // 圆形碰撞体防止因ROTATION_LOCKED被地形卡住
+                Collider::ball(TANK_SIZE * TANK_SCALE / 2.0 + 2.0),
                 ActiveEvents::COLLISION_EVENTS,
                 LockedAxes::ROTATION_LOCKED,
             ))
@@ -166,14 +139,14 @@ pub fn auto_spawn_players(
 
         commands.entity(tank).add_child(shield);
 
-        // 生命条数减少 // The number of lives is reduced
+        // 生命条数减少
         if spawn_player_event.player_no.0 == 1 {
             player_lives.player1 -= 1;
         } else if spawn_player_event.player_no.0 == 2 {
             player_lives.player2 -= 1;
         }
 
-        // 重置状态 // Reset state
+        // 重置状态
         if spawn_player_event.player_no.0 == 1 {
             *spawning_player1 = false;
         } else if spawn_player_event.player_no.0 == 2 {
@@ -186,83 +159,71 @@ pub fn spawn_born(
     pos: Vec3,
     player_no: PlayerNo,
     commands: &mut Commands,
-    texture: Handle<Image>,
-    layout: Handle<TextureAtlasLayout>
+    game_texture_atlas: &Res<GameTextureAtlasHandles>,
 ) {
-    // 出生特效 // Birth effects
-    debug!("spawn born {:?}", player_no);
+    // 出生特效
+    println!("spawn born once");
     commands.spawn((
         Born,
         player_no,
-        SpriteBundle {
-            texture,
+        SpriteSheetBundle {
+            texture_atlas: game_texture_atlas.born.clone(),
             transform: Transform::from_translation(pos),
             ..default()
         },
         AnimationTimer(Timer::from_seconds(0.2, TimerMode::Repeating)),
         AnimationIndices { first: 0, last: 3 },
-        BornRemoveTimer(Timer::from_seconds(0.5, TimerMode::Once)),
-        TextureAtlas{
-            layout,
-            index:0,
-            ..default()
-        }
+        BornRemoveTimer(Timer::from_seconds(2.0, TimerMode::Once)),
     ));
 }
 
-// 玩家移动坦克 // When a player moves a tank
+// 玩家移动坦克
 pub fn players_move(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
+    keyboard_input: Res<Input<KeyCode>>,
     mut query: Query<(
         &PlayerNo,
         &mut Velocity,
         &mut common::Direction,
-        &mut TextureAtlas,
+        &mut TextureAtlasSprite,
         &mut AnimationIndices,
     )>,
 ) {
     for (player_no, mut velocity, mut direction, mut sprite, mut indices) in &mut query {
         if player_no.0 == 1
-            && keyboard_input.any_just_released([
-                KeyCode::KeyW,
-                KeyCode::KeyS,
-                KeyCode::KeyA,
-                KeyCode::KeyD,
-            ])
+            && keyboard_input.any_just_released([KeyCode::W, KeyCode::S, KeyCode::A, KeyCode::D])
         {
             velocity.linvel = Vec2::ZERO;
             continue;
         }
         if player_no.0 == 2
             && keyboard_input.any_just_released([
-                KeyCode::ArrowUp,
-                KeyCode::ArrowDown,
-                KeyCode::ArrowLeft,
-                KeyCode::ArrowRight,
+                KeyCode::Up,
+                KeyCode::Down,
+                KeyCode::Left,
+                KeyCode::Right,
             ])
         {
             velocity.linvel = Vec2::ZERO;
             continue;
         }
-        let old_direction = *direction;
-        // 一次只能移动一个方向 // Can only move in one direction at a time
-        if (player_no.0 == 1 && keyboard_input.pressed(KeyCode::KeyW))
-            || (player_no.0 == 2 && keyboard_input.pressed(KeyCode::ArrowUp))
+        // 一次只能移动一个方向
+        if (player_no.0 == 1 && keyboard_input.pressed(KeyCode::W))
+            || (player_no.0 == 2 && keyboard_input.pressed(KeyCode::Up))
         {
             velocity.linvel = Vec2::new(0.0, PLAYER_SPEED);
             *direction = common::Direction::Up;
-        } else if (player_no.0 == 1 && keyboard_input.pressed(KeyCode::KeyS))
-            || (player_no.0 == 2 && keyboard_input.pressed(KeyCode::ArrowDown))
+        } else if (player_no.0 == 1 && keyboard_input.pressed(KeyCode::S))
+            || (player_no.0 == 2 && keyboard_input.pressed(KeyCode::Down))
         {
             velocity.linvel = Vec2::new(0.0, -PLAYER_SPEED);
             *direction = common::Direction::Down;
-        } else if (player_no.0 == 1 && keyboard_input.pressed(KeyCode::KeyA))
-            || (player_no.0 == 2 && keyboard_input.pressed(KeyCode::ArrowLeft))
+        } else if (player_no.0 == 1 && keyboard_input.pressed(KeyCode::A))
+            || (player_no.0 == 2 && keyboard_input.pressed(KeyCode::Left))
         {
             velocity.linvel = Vec2::new(-PLAYER_SPEED, 0.0);
             *direction = common::Direction::Left;
-        } else if (player_no.0 == 1 && keyboard_input.pressed(KeyCode::KeyD))
-            || (player_no.0 == 2 && keyboard_input.pressed(KeyCode::ArrowRight))
+        } else if (player_no.0 == 1 && keyboard_input.pressed(KeyCode::D))
+            || (player_no.0 == 2 && keyboard_input.pressed(KeyCode::Right))
         {
             velocity.linvel = Vec2::new(PLAYER_SPEED, 0.0);
             *direction = common::Direction::Right;
@@ -270,78 +231,59 @@ pub fn players_move(
             continue;
         }
 
-        let mut player_sprite_offset = 0;
-        if player_no.0 == 2 {
-            player_sprite_offset = 128;
-        }
         match *direction {
             common::Direction::Up => {
-                *indices = AnimationIndices {
-                    first: player_sprite_offset,
-                    last: 1 + player_sprite_offset,
-                };
+                *indices = AnimationIndices { first: 0, last: 1 };
             }
             common::Direction::Right => {
-                *indices = AnimationIndices {
-                    first: 6 + player_sprite_offset,
-                    last: 7 + player_sprite_offset,
-                };
+                *indices = AnimationIndices { first: 8, last: 9 };
             }
             common::Direction::Down => {
                 *indices = AnimationIndices {
-                    first: 4 + player_sprite_offset,
-                    last: 5 + player_sprite_offset,
+                    first: 16,
+                    last: 17,
                 };
             }
             common::Direction::Left => {
                 *indices = AnimationIndices {
-                    first: 2 + player_sprite_offset,
-                    last: 3 + player_sprite_offset,
+                    first: 24,
+                    last: 25,
                 };
             }
         }
-        // We want to reset the sprite only when a direction is changed, otherwise the animation will be broken.
-        if old_direction != *direction {
-            sprite.index = indices.first;
-        }
+        sprite.index = indices.first;
     }
 }
 
-// 坦克移动动画播放 // Tank moving animation playback
+// 坦克移动动画播放
 pub fn animate_players(
     time: Res<Time>,
     mut query: Query<
         (
             &mut AnimationTimer,
             &AnimationIndices,
-            &mut TextureAtlas,
-            &Velocity,
+            &mut TextureAtlasSprite,
         ),
         With<PlayerNo>,
     >,
 ) {
-    for (mut timer, indices, mut sprite, velocity) in &mut query {
+    for (mut timer, indices, mut sprite) in &mut query {
         timer.0.tick(time.delta());
         if timer.0.just_finished() {
-            if velocity.linvel != Vec2::ZERO {
-                // 切换到下一个sprite // Switch to next sprite
-                sprite.index = if sprite.index >= indices.last || sprite.index < indices.first {
-                    indices.first
-                } else {
-                    sprite.index + 1
-                };
+            // 切换到下一个sprite
+            sprite.index = if sprite.index == indices.last {
+                indices.first
             } else {
-                // Return sprite back to default state
-                sprite.index = indices.first
+                sprite.index + 1
             };
         }
     }
 }
 
-// 玩家攻击 // Player attack
+// 玩家攻击
 pub fn players_attack(
     mut commands: Commands,
-    keyboard_input: Res<ButtonInput<KeyCode>>,
+    keyboard_input: Res<Input<KeyCode>>,
     mut q_players: Query<(
         &PlayerNo,
         &Transform,
@@ -350,13 +292,12 @@ pub fn players_attack(
     )>,
     time: Res<Time>,
     game_sounds: Res<GameSounds>,
-    game_texture_atlas: Res<GameTextureLayout>,
-    game_texture_handles: Res<GameTextureHandles>,
+    game_texture_atlas: Res<GameTextureAtlasHandles>,
 ) {
     for (player_no, transform, direction, mut refresh_bullet_timer) in &mut q_players {
         refresh_bullet_timer.tick(time.delta());
         if (player_no.0 == 1 && keyboard_input.just_pressed(KeyCode::Space))
-            || (player_no.0 == 2 && keyboard_input.just_pressed(KeyCode::Enter))
+            || (player_no.0 == 2 && keyboard_input.just_pressed(KeyCode::Return))
         {
             if refresh_bullet_timer.finished() {
                 spawn_bullet(
@@ -364,8 +305,7 @@ pub fn players_attack(
                     &game_texture_atlas,
                     Bullet::Player,
                     transform.translation,
-                    *direction,
-                    game_texture_handles.bullet.clone(),
+                    direction.clone(),
                 );
                 commands.spawn(AudioBundle {
                     source: game_sounds.player_fire.clone(),
@@ -377,15 +317,32 @@ pub fn players_attack(
     }
 }
 
-// 保护盾动画播放 // Protective shield animation playback
+// 保护盾动画播放
 pub fn animate_shield(
     time: Res<Time>,
-    mut query: Query<(&mut AnimationTimer, &AnimationIndices, &mut TextureAtlas), With<Shield>>,
+    mut query: Query<
+        (
+            &mut AnimationTimer,
+            &AnimationIndices,
+            &mut TextureAtlasSprite,
+        ),
+        With<Shield>,
+    >,
 ) {
-    animate_sprite(time, query);
+    for (mut timer, indices, mut sprite) in &mut query {
+        timer.0.tick(time.delta());
+        if timer.0.just_finished() {
+            // 切换到下一个sprite
+            sprite.index = if sprite.index == indices.last {
+                indices.first
+            } else {
+                sprite.index + 1
+            };
+        }
+    }
 }
 
-// 移除保护盾 // Remove shield
+// 移除保护盾
 pub fn remove_shield(
     mut commands: Commands,
     time: Res<Time>,
@@ -400,7 +357,7 @@ pub fn remove_shield(
     }
 }
 
-// 出生动画播放 // Birth animation playback
+// 出生动画播放
 pub fn animate_born(
     mut commands: Commands,
     time: Res<Time>,
@@ -411,7 +368,7 @@ pub fn animate_born(
             &Transform,
             &mut AnimationTimer,
             &AnimationIndices,
-            &mut TextureAtlas,
+            &mut TextureAtlasSprite,
             &mut BornRemoveTimer,
         ),
         With<Born>,
@@ -424,7 +381,7 @@ pub fn animate_born(
         timer.0.tick(time.delta());
         born_remove_timer.0.tick(time.delta());
         if timer.0.just_finished() {
-            // 切换到下一个sprite // Switch to next sprite
+            // 切换到下一个sprite
             sprite.index = if sprite.index == indices.last {
                 indices.first
             } else {
@@ -435,7 +392,7 @@ pub fn animate_born(
             commands.entity(entity).despawn();
             spawn_player_ew.send(SpawnPlayerEvent {
                 pos: transform.translation.truncate(),
-                player_no: *player_no,
+                player_no: player_no.clone(),
             });
         }
     }
