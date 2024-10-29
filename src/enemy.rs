@@ -7,20 +7,20 @@ use crate::{
     common::{
         self, AnimationIndices, AnimationTimer, GameTextureAtlasHandles, TankRefreshBulletTimer,
         ENEMIES_PER_LEVEL, ENEMY_REFRESH_BULLET_INTERVAL, ENEMY_SPEED, MAX_LIVE_ENEMIES,
-        TANK_SCALE, TANK_SIZE, TILE_SIZE, TANKS_SPRITE_COLS_AMOUNT,
+        TANK_SCALE, TANK_SIZE, TILE_SIZE,
     },
     level::{EnemiesMarker, LevelItem},
     player::PlayerNo,
 };
 
-// 当前关卡生成的敌人数量 // The number of enemies spawned in the current level
+// 当前关卡生成的敌人数量
 #[derive(Resource)]
 pub struct LevelSpawnedEnemies(pub i32);
 
 #[derive(Component)]
 pub struct Enemy;
 
-// 转向计时器 // Change direction timer
+// 转向计时器
 #[derive(Component)]
 pub struct EnemyChangeDirectionTimer(pub Timer);
 
@@ -33,16 +33,16 @@ pub fn auto_spawn_enemies(
     game_texture_atlas: Res<GameTextureAtlasHandles>,
 ) {
     if q_enemies.into_iter().len() >= MAX_LIVE_ENEMIES as usize {
-        // 战场上存活敌人已达到最大值 // The number of surviving enemies on the battlefield has reached the maximum value
+        // 战场上存活敌人已达到最大值
         return;
     }
     if level_spawned_enemies.0 == ENEMIES_PER_LEVEL {
-        // 本关卡已生成敌人数量达最大值 // The maximum number of enemies has been generated in this level
+        // 本关卡已生成敌人数量达最大值
         return;
     }
     let mut marker_positions = Vec::new();
     for enemy_marker in &q_enemies_marker {
-        // 防止player1_marker还未初始化 // Prevent player1_marker from not being initialized yet
+        // 防止player1_marker还未初始化
         if enemy_marker.translation() == Vec3::ZERO {
             continue;
         }
@@ -50,14 +50,14 @@ pub fn auto_spawn_enemies(
     }
 
     if marker_positions.len() > 0 {
-        // 随机地点 // Random location
+        // 随机地点
         let mut rng = rand::thread_rng();
         let choosed_pos = marker_positions
             .get(rng.gen_range(0..marker_positions.len()))
             .unwrap()
             .translation();
 
-        // 不能距离战场坦克过近 // Don’t get too close to tanks on the battlefield
+        // 不能距离战场坦克过近
         for enemy_pos in &q_enemies {
             if choosed_pos.distance(enemy_pos.translation) < 2. * TILE_SIZE {
                 return;
@@ -78,7 +78,7 @@ pub fn spawn_enemy(
     commands: &mut Commands,
     game_texture_atlas: &Res<GameTextureAtlasHandles>,
 ) {
-    // 随机颜色 // Random type
+    // 随机颜色
     let indexes: Vec<i32> = enemies_sprite_index_sets()
         .iter()
         .map(|v| *v.get(0).unwrap())
@@ -96,7 +96,7 @@ pub fn spawn_enemy(
                 index: choosed_index as usize,
                 ..default()
             },
-            texture_atlas: game_texture_atlas.tanks.clone(),
+            texture_atlas: game_texture_atlas.enemies.clone(),
             transform: Transform {
                 translation: pos,
                 scale: Vec3::splat(TANK_SCALE),
@@ -122,7 +122,8 @@ pub fn spawn_enemy(
     ));
 }
 
-// TODO 发现玩家后主动攻击 // TODO: Actively attack after discovering the player
+// TODO 发现玩家后主动攻击
+// TODO 树林可躲藏
 pub fn enemies_move(
     mut q_enemies: Query<
         (
@@ -157,13 +158,13 @@ pub fn enemies_move(
             continue;
         }
 
-        // 重新选择方向 // Re-select direction
+        // 重新选择方向
         let mut can_left = true;
         let mut can_right = true;
         let mut can_up = true;
         let mut can_down = true;
 
-        // 当前可走路径 // Current path available
+        // 当前可走路径
         for (level_item, level_item_transform) in &q_level_items {
             if *level_item == LevelItem::Tree {
                 continue;
@@ -201,7 +202,7 @@ pub fn enemies_move(
             continue;
         }
 
-        // 根据权重随机一个方向 // Randomly move in a direction based on weight
+        // 根据权重随机一个方向
         let mut rng = rand::thread_rng();
         let choosed_direction = loop {
             let rand = rng.gen_range(0..9);
@@ -230,7 +231,7 @@ pub fn enemies_move(
             }
         };
 
-        // 设置方向和sprite // Set direction and sprite
+        // 设置方向和sprite
         *direction = choosed_direction;
         sprite.index = new_sprite_index(sprite.index as i32, *direction) as usize;
         *indices = AnimationIndices {
@@ -238,7 +239,7 @@ pub fn enemies_move(
             last: sprite.index + 1,
         };
 
-        // 重置转向计时器 // Reset turn timer
+        // 重置转向计时器
         timer.0.reset();
     }
 }
@@ -282,7 +283,7 @@ pub fn handle_enemy_collision(
                     continue;
                 };
 
-                // 重置转向计时器 // Reset turn timer
+                // 重置转向计时器
                 let mut change_direction_timer = q_enemies
                     .get_component_mut::<EnemyChangeDirectionTimer>(enemy_entity)
                     .unwrap();
@@ -292,7 +293,7 @@ pub fn handle_enemy_collision(
     }
 }
 
-// 坦克移动动画播放 // Tank moving animation playback
+// 坦克移动动画播放
 pub fn animate_enemies(
     time: Res<Time>,
     mut query: Query<
@@ -307,7 +308,7 @@ pub fn animate_enemies(
     for (mut timer, indices, mut sprite) in &mut query {
         timer.0.tick(time.delta());
         if timer.0.just_finished() {
-            // 切换到下一个sprite // Switch to next sprite
+            // 切换到下一个sprite
             sprite.index = if sprite.index == indices.last {
                 indices.first
             } else {
@@ -327,90 +328,17 @@ pub fn reset_level_spawned_enemies(mut level_spawned_enemies: ResMut<LevelSpawne
     level_spawned_enemies.0 = 0;
 }
 
-// TODO: Refactor it.
 pub fn enemies_sprite_index_sets() -> Vec<Vec<i32>> {
     vec![
-        // 上右下左 + 其他可能index // Columns: top, right, bottom, left + the same postitions for movement
-        vec![
-            8 + TANKS_SPRITE_COLS_AMOUNT * 0,
-            14 + TANKS_SPRITE_COLS_AMOUNT * 0,
-            12 + TANKS_SPRITE_COLS_AMOUNT * 0,
-            10 + TANKS_SPRITE_COLS_AMOUNT * 0,
-            9 + TANKS_SPRITE_COLS_AMOUNT * 0,
-            15 + TANKS_SPRITE_COLS_AMOUNT * 0,
-            13 + TANKS_SPRITE_COLS_AMOUNT * 0,
-            11 + TANKS_SPRITE_COLS_AMOUNT * 0
-        ],
-        vec![
-            8 + TANKS_SPRITE_COLS_AMOUNT * 1,
-            14 + TANKS_SPRITE_COLS_AMOUNT * 1,
-            12 + TANKS_SPRITE_COLS_AMOUNT * 1,
-            10 + TANKS_SPRITE_COLS_AMOUNT * 1,
-            9 + TANKS_SPRITE_COLS_AMOUNT * 1,
-            15 + TANKS_SPRITE_COLS_AMOUNT * 1,
-            13 + TANKS_SPRITE_COLS_AMOUNT * 1,
-            11 + TANKS_SPRITE_COLS_AMOUNT * 1
-        ],
-        vec![
-            8 + TANKS_SPRITE_COLS_AMOUNT * 2,
-            14 + TANKS_SPRITE_COLS_AMOUNT * 2,
-            12 + TANKS_SPRITE_COLS_AMOUNT * 2,
-            10 + TANKS_SPRITE_COLS_AMOUNT * 2,
-            9 + TANKS_SPRITE_COLS_AMOUNT * 2,
-            15 + TANKS_SPRITE_COLS_AMOUNT * 2,
-            13 + TANKS_SPRITE_COLS_AMOUNT * 2,
-            11 + TANKS_SPRITE_COLS_AMOUNT * 2
-        ],
-        vec![
-            8 + TANKS_SPRITE_COLS_AMOUNT * 3,
-            14 + TANKS_SPRITE_COLS_AMOUNT * 3,
-            12 + TANKS_SPRITE_COLS_AMOUNT * 3,
-            10 + TANKS_SPRITE_COLS_AMOUNT * 3,
-            9 + TANKS_SPRITE_COLS_AMOUNT * 3,
-            15 + TANKS_SPRITE_COLS_AMOUNT * 3,
-            13 + TANKS_SPRITE_COLS_AMOUNT * 3,
-            11 + TANKS_SPRITE_COLS_AMOUNT * 3
-        ],
-        vec![
-            8 + TANKS_SPRITE_COLS_AMOUNT * 4,
-            14 + TANKS_SPRITE_COLS_AMOUNT * 4,
-            12 + TANKS_SPRITE_COLS_AMOUNT * 4,
-            10 + TANKS_SPRITE_COLS_AMOUNT * 4,
-            9 + TANKS_SPRITE_COLS_AMOUNT * 4,
-            15 + TANKS_SPRITE_COLS_AMOUNT * 4,
-            13 + TANKS_SPRITE_COLS_AMOUNT * 4,
-            11 + TANKS_SPRITE_COLS_AMOUNT * 4
-        ],
-        vec![
-            8 + TANKS_SPRITE_COLS_AMOUNT * 5,
-            14 + TANKS_SPRITE_COLS_AMOUNT * 5,
-            12 + TANKS_SPRITE_COLS_AMOUNT * 5,
-            10 + TANKS_SPRITE_COLS_AMOUNT * 5,
-            9 + TANKS_SPRITE_COLS_AMOUNT * 5,
-            15 + TANKS_SPRITE_COLS_AMOUNT * 5,
-            13 + TANKS_SPRITE_COLS_AMOUNT * 5,
-            11 + TANKS_SPRITE_COLS_AMOUNT * 5
-        ],
-        vec![
-            8 + TANKS_SPRITE_COLS_AMOUNT * 6,
-            14 + TANKS_SPRITE_COLS_AMOUNT * 6,
-            12 + TANKS_SPRITE_COLS_AMOUNT * 6,
-            10 + TANKS_SPRITE_COLS_AMOUNT * 6,
-            9 + TANKS_SPRITE_COLS_AMOUNT * 6,
-            15 + TANKS_SPRITE_COLS_AMOUNT * 6,
-            13 + TANKS_SPRITE_COLS_AMOUNT * 6,
-            11 + TANKS_SPRITE_COLS_AMOUNT * 6
-        ],
-        vec![
-            8 + TANKS_SPRITE_COLS_AMOUNT * 7,
-            14 + TANKS_SPRITE_COLS_AMOUNT * 7,
-            12 + TANKS_SPRITE_COLS_AMOUNT * 7,
-            10 + TANKS_SPRITE_COLS_AMOUNT * 7,
-            9 + TANKS_SPRITE_COLS_AMOUNT * 7,
-            15 + TANKS_SPRITE_COLS_AMOUNT * 7,
-            13 + TANKS_SPRITE_COLS_AMOUNT * 7,
-            11 + TANKS_SPRITE_COLS_AMOUNT * 7
-        ],
+        // 上右下左 + 其他可能index
+        vec![0, 8, 16, 24, 1, 9, 17, 25],
+        vec![2, 10, 18, 26, 3, 11, 19, 27],
+        vec![4, 12, 20, 28, 5, 13, 21, 29],
+        vec![6, 14, 22, 30, 7, 15, 23, 31],
+        vec![32, 40, 48, 56, 33, 41, 49, 57],
+        vec![34, 42, 50, 58, 35, 43, 51, 59],
+        vec![36, 44, 52, 60, 37, 45, 53, 61],
+        vec![38, 46, 54, 62, 39, 47, 55, 63],
     ]
 }
 pub fn new_sprite_index(current_index: i32, direction: common::Direction) -> i32 {

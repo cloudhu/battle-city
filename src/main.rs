@@ -40,21 +40,13 @@ fn main() {
             player1: 3,
             player2: 3,
         })
-        .register_ldtk_entity::<level::BrickWallBundle>("BrickWall")
+        .register_ldtk_entity::<level::StoneWallBundle>("StoneWall")
         .register_ldtk_entity::<level::IronWallBundle>("IronWall")
         .register_ldtk_entity::<level::WaterBundle>("Water")
         .register_ldtk_entity::<level::HomeBundle>("Home")
         .register_ldtk_entity::<level::Player1MarkerBundle>("Player1")
         .register_ldtk_entity::<level::Player2MarkerBundle>("Player2")
         .register_ldtk_entity::<level::EnemiesMarkerBundle>("Enemies")
-        .register_ldtk_entity::<level::BrickWallRightBundle>("BrickWallRight")
-        .register_ldtk_entity::<level::BrickWallBottomBundle>("BrickWallBottom")
-        .register_ldtk_entity::<level::BrickWallLeftBundle>("BrickWallLeft")
-        .register_ldtk_entity::<level::BrickWallTopBundle>("BrickWallTop")
-        .register_ldtk_entity::<level::IronWallRightBundle>("IronWallRight")
-        .register_ldtk_entity::<level::IronWallBottomBundle>("IronWallBottom")
-        .register_ldtk_entity::<level::IronWallLeftBundle>("IronWallLeft")
-        .register_ldtk_entity::<level::IronWallTopBundle>("IronWallTop")
         .add_systems(
             Startup,
             (
@@ -87,8 +79,6 @@ fn main() {
             Update,
             (start_game, switch_multiplayer_mode).run_if(in_state(AppState::StartMenu)),
         )
-        // Uncomment to skip the start screen
-        //.add_systems(Update, (dev_start_game).run_if(in_state(AppState::StartMenu)))
         .add_systems(
             OnExit(AppState::StartMenu),
             (despawn_screen::<OnStartMenuScreen>,),
