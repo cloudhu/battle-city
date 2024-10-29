@@ -55,7 +55,7 @@ pub fn setup_explosion_assets(mut commands: Commands, asset_server: Res<AssetSer
     });
 }
 
-// 炮弹移动 // Bullet movement
+// 炮弹移动
 pub fn move_bullet(
     mut q_bullet: Query<(&mut Transform, &common::Direction), With<Bullet>>,
     time: Res<Time>,
@@ -110,30 +110,31 @@ pub fn handle_bullet_collision(
                     *entity1
                 };
 
-                trace!(
-                    "Bullet: {:?}, collision entity1: {:?}, entity2: {:?}",
+                println!(
+                    "bullet: {:?}, collision entity1: {:?}, entity2: {:?}",
                     bullet_entity, entity1, entity2
                 );
 
                 let bullet = q_bullets.get_component::<Bullet>(bullet_entity).unwrap();
                 let bullet_transform = q_bullets.get_component::<Transform>(bullet_entity).unwrap();
 
-                // 另一个物体 // Another object
+                info!("bullet hit something");
+                // 另一个物体
                 if q_level_items.contains(other_entity) {
+                    info!("Bullet hit level item");
                     let level_item = q_level_items
                         .get_component::<LevelItem>(other_entity)
                         .unwrap();
                     let level_item_transform = q_level_items
                         .get_component::<GlobalTransform>(other_entity)
                         .unwrap();
-                    trace!("Bullet hit {:?}", level_item);
-                    // dbg!(level_item);
+                    dbg!(level_item);
                     // dbg!(bullet_transform);
                     // dbg!(level_item_transform);
                     match level_item {
                         LevelItem::Home => {
                             // Game Over
-                            info!("Game over");
+                            println!("Game over");
                             commands.entity(bullet_entity).despawn();
                             explosion_ew.send(ExplosionEvent {
                                 pos: Vec3::new(
@@ -173,7 +174,7 @@ pub fn handle_bullet_collision(
                 }
 
                 if q_area_wall.contains(other_entity) {
-                    trace!("Bullet hit area wall");
+                    info!("Bullet hit area wall");
                     commands.entity(bullet_entity).despawn();
                     explosion_ew.send(ExplosionEvent {
                         pos: Vec3::new(
@@ -186,7 +187,7 @@ pub fn handle_bullet_collision(
                 }
 
                 if *bullet == Bullet::Player && q_enemies.contains(other_entity) {
-                    debug!("Player bullet hit enemy");
+                    info!("Player bullet hit enemy");
                     let enemy_transform =
                         q_enemies.get_component::<Transform>(other_entity).unwrap();
                     commands.entity(bullet_entity).despawn();
@@ -202,7 +203,7 @@ pub fn handle_bullet_collision(
                 }
 
                 if *bullet == Bullet::Enemy && q_players.contains(other_entity) {
-                    debug!("Enemy bullet hit player");
+                    info!("Enemy bullet hit player");
                     let player_children =
                         q_players.get_component::<Children>(other_entity).unwrap();
                     let mut player_has_shield = false;
@@ -218,7 +219,7 @@ pub fn handle_bullet_collision(
                     commands.entity(bullet_entity).despawn();
 
                     if player_has_shield {
-                        trace!("Player has shield");
+                        info!("Player has shield");
                         explosion_ew.send(ExplosionEvent {
                             pos: Vec3::new(
                                 player_transform.translation.x,
