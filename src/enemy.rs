@@ -7,8 +7,7 @@ use crate::{
     common::{
         self, AnimationIndices, AnimationTimer, GameTextureAtlasHandles, TankRefreshBulletTimer,
         ENEMIES_PER_LEVEL, ENEMY_REFRESH_BULLET_INTERVAL, ENEMY_SPEED, MAX_LIVE_ENEMIES,
-        PHYSICS_SCALE_PER_METER, TANKS_SPRITE_COLS_AMOUNT, TANK_ROUND_CORNERS, TANK_SCALE,
-        TANK_SIZE, TILE_SIZE,
+        TANK_SCALE, TANK_SIZE, TILE_SIZE, TANKS_SPRITE_COLS_AMOUNT, TANK_ROUND_CORNERS, PHYSICS_SCALE_PER_METER
     },
     level::{EnemiesMarker, LevelItem},
     player::PlayerNo,
@@ -47,10 +46,10 @@ pub fn auto_spawn_enemies(
         if enemy_marker.translation() == Vec3::ZERO {
             continue;
         }
-        marker_positions.push(*enemy_marker);
+        marker_positions.push(enemy_marker.clone());
     }
 
-    if !marker_positions.is_empty() {
+    if marker_positions.len() > 0 {
         // 随机地点 // Random location
         let mut rng = rand::thread_rng();
         let choosed_pos = marker_positions
@@ -85,13 +84,16 @@ pub fn spawn_enemy(
         .map(|v| *v.get(0).unwrap())
         .collect();
     let mut rng = rand::thread_rng();
-    let choosed_index = indexes.get(rng.gen_range(0..indexes.len())).unwrap();
+    let choosed_index = indexes
+        .get(rng.gen_range(0..indexes.len()))
+        .unwrap()
+        .clone();
 
     commands.spawn((
         Enemy,
         SpriteSheetBundle {
             sprite: TextureAtlasSprite {
-                index: *choosed_index as usize,
+                index: choosed_index as usize,
                 ..default()
             },
             texture_atlas: game_texture_atlas.tanks.clone(),
@@ -109,16 +111,12 @@ pub fn spawn_enemy(
         EnemyChangeDirectionTimer(Timer::from_seconds(1.0, TimerMode::Once)),
         AnimationTimer(Timer::from_seconds(0.2, TimerMode::Repeating)),
         AnimationIndices {
-            first: *choosed_index as usize,
-            last: *choosed_index as usize + 1,
+            first: choosed_index as usize,
+            last: choosed_index as usize + 1,
         },
         common::Direction::Up,
         RigidBody::Dynamic,
-        Collider::round_cuboid(
-            (TANK_SIZE * TANK_SCALE / 2.0) - TANK_ROUND_CORNERS,
-            (TANK_SIZE * TANK_SCALE / 2.0) - TANK_ROUND_CORNERS,
-            TANK_ROUND_CORNERS / PHYSICS_SCALE_PER_METER,
-        ),
+        Collider::round_cuboid((TANK_SIZE * TANK_SCALE / 2.0) - TANK_ROUND_CORNERS, (TANK_SIZE * TANK_SCALE / 2.0) - TANK_ROUND_CORNERS, TANK_ROUND_CORNERS / PHYSICS_SCALE_PER_METER),
         LockedAxes::ROTATION_LOCKED,
     ));
 }
@@ -261,7 +259,7 @@ pub fn enemies_attack(
                 &game_texture_atlas,
                 Bullet::Enemy,
                 transform.translation,
-                *direction,
+                direction.clone(),
             );
         }
     }
@@ -340,7 +338,7 @@ pub fn enemies_sprite_index_sets() -> Vec<Vec<i32>> {
             9 + TANKS_SPRITE_COLS_AMOUNT * 0,
             15 + TANKS_SPRITE_COLS_AMOUNT * 0,
             13 + TANKS_SPRITE_COLS_AMOUNT * 0,
-            11 + TANKS_SPRITE_COLS_AMOUNT * 0,
+            11 + TANKS_SPRITE_COLS_AMOUNT * 0
         ],
         vec![
             8 + TANKS_SPRITE_COLS_AMOUNT * 1,
@@ -350,7 +348,7 @@ pub fn enemies_sprite_index_sets() -> Vec<Vec<i32>> {
             9 + TANKS_SPRITE_COLS_AMOUNT * 1,
             15 + TANKS_SPRITE_COLS_AMOUNT * 1,
             13 + TANKS_SPRITE_COLS_AMOUNT * 1,
-            11 + TANKS_SPRITE_COLS_AMOUNT * 1,
+            11 + TANKS_SPRITE_COLS_AMOUNT * 1
         ],
         vec![
             8 + TANKS_SPRITE_COLS_AMOUNT * 2,
@@ -360,7 +358,7 @@ pub fn enemies_sprite_index_sets() -> Vec<Vec<i32>> {
             9 + TANKS_SPRITE_COLS_AMOUNT * 2,
             15 + TANKS_SPRITE_COLS_AMOUNT * 2,
             13 + TANKS_SPRITE_COLS_AMOUNT * 2,
-            11 + TANKS_SPRITE_COLS_AMOUNT * 2,
+            11 + TANKS_SPRITE_COLS_AMOUNT * 2
         ],
         vec![
             8 + TANKS_SPRITE_COLS_AMOUNT * 3,
@@ -370,7 +368,7 @@ pub fn enemies_sprite_index_sets() -> Vec<Vec<i32>> {
             9 + TANKS_SPRITE_COLS_AMOUNT * 3,
             15 + TANKS_SPRITE_COLS_AMOUNT * 3,
             13 + TANKS_SPRITE_COLS_AMOUNT * 3,
-            11 + TANKS_SPRITE_COLS_AMOUNT * 3,
+            11 + TANKS_SPRITE_COLS_AMOUNT * 3
         ],
         vec![
             8 + TANKS_SPRITE_COLS_AMOUNT * 4,
@@ -380,7 +378,7 @@ pub fn enemies_sprite_index_sets() -> Vec<Vec<i32>> {
             9 + TANKS_SPRITE_COLS_AMOUNT * 4,
             15 + TANKS_SPRITE_COLS_AMOUNT * 4,
             13 + TANKS_SPRITE_COLS_AMOUNT * 4,
-            11 + TANKS_SPRITE_COLS_AMOUNT * 4,
+            11 + TANKS_SPRITE_COLS_AMOUNT * 4
         ],
         vec![
             8 + TANKS_SPRITE_COLS_AMOUNT * 5,
@@ -390,7 +388,7 @@ pub fn enemies_sprite_index_sets() -> Vec<Vec<i32>> {
             9 + TANKS_SPRITE_COLS_AMOUNT * 5,
             15 + TANKS_SPRITE_COLS_AMOUNT * 5,
             13 + TANKS_SPRITE_COLS_AMOUNT * 5,
-            11 + TANKS_SPRITE_COLS_AMOUNT * 5,
+            11 + TANKS_SPRITE_COLS_AMOUNT * 5
         ],
         vec![
             8 + TANKS_SPRITE_COLS_AMOUNT * 6,
@@ -400,7 +398,7 @@ pub fn enemies_sprite_index_sets() -> Vec<Vec<i32>> {
             9 + TANKS_SPRITE_COLS_AMOUNT * 6,
             15 + TANKS_SPRITE_COLS_AMOUNT * 6,
             13 + TANKS_SPRITE_COLS_AMOUNT * 6,
-            11 + TANKS_SPRITE_COLS_AMOUNT * 6,
+            11 + TANKS_SPRITE_COLS_AMOUNT * 6
         ],
         vec![
             8 + TANKS_SPRITE_COLS_AMOUNT * 7,
@@ -410,7 +408,7 @@ pub fn enemies_sprite_index_sets() -> Vec<Vec<i32>> {
             9 + TANKS_SPRITE_COLS_AMOUNT * 7,
             15 + TANKS_SPRITE_COLS_AMOUNT * 7,
             13 + TANKS_SPRITE_COLS_AMOUNT * 7,
-            11 + TANKS_SPRITE_COLS_AMOUNT * 7,
+            11 + TANKS_SPRITE_COLS_AMOUNT * 7
         ],
     ]
 }
@@ -435,5 +433,5 @@ pub fn new_sprite_index(current_index: i32, direction: common::Direction) -> i32
             }
         }
     }
-    0
+    return 0;
 }
