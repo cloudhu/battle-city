@@ -3,7 +3,8 @@ use std::time::Duration;
 use bevy::prelude::*;
 
 use crate::common::{
-    AppState, GameSounds, GameTextureAtlasHandles, MultiplayerMode, SPRITE_GAME_OVER_ORDER,
+    AppState, GameSounds, GameTextureHandles, GameTextureLayout, MultiplayerMode,
+    SPRITE_GAME_OVER_Z_ORDER,
 };
 
 #[derive(Component)]
@@ -18,7 +19,8 @@ pub fn setup_start_menu(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     game_sounds: Res<GameSounds>,
-    game_texture_atlas: Res<GameTextureAtlasHandles>,
+    game_texture_handles: Res<GameTextureHandles>,
+    game_texture_atlas: Res<GameTextureLayout>,
 ) {
     commands
         .spawn((
@@ -40,8 +42,8 @@ pub fn setup_start_menu(
                 ..default()
             });
             parent.spawn((
-                AtlasImageBundle {
-                    texture_atlas: game_texture_atlas.player1.clone(),
+                ImageBundle {
+                    image: UiImage::from(game_texture_handles.tanks.clone()),
                     style: Style {
                         width: Val::Px(20.),
                         height: Val::Px(20.),
@@ -53,13 +55,18 @@ pub fn setup_start_menu(
                     },
                     ..default()
                 },
+                TextureAtlas {
+                    layout: game_texture_atlas.tanks.clone(),
+                    index: 0,
+                },
                 OnStartMenuScreenMultiplayerModeFlag,
             ));
         });
     commands.spawn(AudioBundle {
-        source: game_sounds.start_menu.clone(),
+        source: game_sounds.start_menu.clone() ,
         settings: PlaybackSettings::DESPAWN,
     });
+
 }
 
 pub fn setup_game_over(
@@ -72,7 +79,7 @@ pub fn setup_game_over(
         OnGameOverScreen,
         SpriteBundle {
             texture: game_over_texture,
-            transform: Transform::from_translation(Vec3::new(0., -400., SPRITE_GAME_OVER_ORDER)),
+            transform: Transform::from_translation(Vec3::new(0., -400., SPRITE_GAME_OVER_Z_ORDER)),
             ..default()
         },
     ));
@@ -103,21 +110,33 @@ pub fn animate_game_over(
     }
 }
 
-pub fn start_game(keyboard_input: Res<Input<KeyCode>>, mut app_state: ResMut<NextState<AppState>>) {
-    if keyboard_input.any_just_pressed([KeyCode::Return, KeyCode::Space]) {
+pub fn start_game(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut app_state: ResMut<NextState<AppState>>,
+) {
+    if keyboard_input.any_just_pressed([KeyCode::Enter, KeyCode::Space]) {
         info!("Switch app state to playing");
         app_state.set(AppState::Playing);
     }
 }
 
+// Helper function to speed up development: allows to skip the first screen
+pub fn dev_start_game(
+    mut app_state: ResMut<NextState<AppState>>,
+    mut multiplayer_mode: ResMut<MultiplayerMode>,
+) {
+    *multiplayer_mode = MultiplayerMode::TwoPlayers;
+    app_state.set(AppState::Playing);
+}
+
 pub fn switch_multiplayer_mode(
     mut commands: Commands,
-    keyboard_input: Res<Input<KeyCode>>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
     mut multiplayer_mode: ResMut<MultiplayerMode>,
     mut q_multiplayer_mode_flag: Query<&mut Style, With<OnStartMenuScreenMultiplayerModeFlag>>,
     game_sounds: Res<GameSounds>,
 ) {
-    if keyboard_input.any_just_pressed([KeyCode::Up, KeyCode::Down]) {
+    if keyboard_input.any_just_pressed([KeyCode::ArrowUp, KeyCode::ArrowDown]) {
         for mut style in &mut q_multiplayer_mode_flag {
             if *multiplayer_mode == MultiplayerMode::SinglePlayer {
                 style.top = Val::Px(440.);
@@ -137,39 +156,35 @@ pub fn switch_multiplayer_mode(
 pub fn pause_game(
     mut commands: Commands,
     mut app_state: ResMut<NextState<AppState>>,
-    keyboard_input: Res<Input<KeyCode>>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
     game_sounds: Res<GameSounds>,
     mut cold_start: Local<Duration>,
     time: Res<Time>,
 ) {
-    // 增加冷启动防止 pause_game 和 unpause_game 都会收到input，导致Paued<->Playing不断循环
+    // 增加冷启动防止 pause_game 和 unpause_game 都会收到input，导致Paused<->Playing不断循环 // Add cold start to prevent both pause_game and unpause_game from receiving input, causing Paused<->Playing to loop continuously.
     *cold_start += time.delta();
-    if cold_start.as_millis() > 100 {
-        if keyboard_input.just_released(KeyCode::Escape) {
-            info!("Pause game");
-            commands.spawn(AudioBundle {
-                source: game_sounds.game_pause.clone(),
-                settings: PlaybackSettings::DESPAWN,
-            });
-            app_state.set(AppState::Paused);
-            *cold_start = Duration::ZERO;
-        }
+    if cold_start.as_millis() > 100 && keyboard_input.just_released(KeyCode::Escape) {
+        info!("Pause game");
+        commands.spawn(AudioBundle {
+            source: game_sounds.game_pause.clone(),
+            settings: PlaybackSettings::DESPAWN,
+        });
+        app_state.set(AppState::Paused);
+        *cold_start = Duration::ZERO;
     }
 }
 
 pub fn unpause_game(
     mut app_state: ResMut<NextState<AppState>>,
-    keyboard_input: Res<Input<KeyCode>>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
     mut cold_start: Local<Duration>,
     time: Res<Time>,
 ) {
     *cold_start += time.delta();
-    if cold_start.as_millis() > 100 {
-        if keyboard_input.just_released(KeyCode::Escape) {
-            info!("Unpause game");
-            app_state.set(AppState::Playing);
-            *cold_start = Duration::ZERO;
-        }
+    if cold_start.as_millis() > 100 && keyboard_input.just_released(KeyCode::Escape) {
+        info!("Unpause game");
+        app_state.set(AppState::Playing);
+        *cold_start = Duration::ZERO;
     }
 }
 
